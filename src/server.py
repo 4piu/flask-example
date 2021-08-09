@@ -18,7 +18,7 @@ from utility.MyResponse import MyResponse
 
 logger = get_logger(__name__)
 
-app = Flask("GMS")
+app = Flask("MY_APP")
 
 app.logger = logger
 
@@ -153,7 +153,7 @@ swagger_config = {
     "specs_route": "/docs/"
 }
 app.config['SWAGGER'] = {
-    "title": "VSAIS API Document",
+    "title": "API Document",
     "uiversion": 3,
     "openapi": "3.0.3"
 }
@@ -166,10 +166,10 @@ if bool(config.get("cors")):
 
 
 def run():
-    logger.info(f"bjoern listening on 0.0.0.0:{config.get('listen_port', 8080)}")
     if os.getenv("ENV", "PROD") == "PROD":
-        # begin server loop
         import bjoern
+        logger.info(f"bjoern listening on 0.0.0.0:{config.get('listen_port', 8080)}")
+        # begin server loop
         bjoern.run(app, host="0.0.0.0", port=config.get("listen_port", 8080))
     else:
         app.run(host="0.0.0.0", port=config.get("listen_port", 8080))
