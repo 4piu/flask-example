@@ -1,0 +1,91 @@
+# Build the app and deploy on remote host
+
+name: CI
+
+# Controls when the action will run. 
+on:
+  # Triggers the workflow on push or pull request events but only for the main branch
+  #push:
+    #branches: [ main ]
+  #pull_request:
+    #branches: [ main ]
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+jobs:
+  # This workflow contains a single job called "build"
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+      - name: Checkout
+        uses: actions/checkout@v2
+        
+      # Generate essential file from secrets
+      - name: Variable substitution
+        uses: microsoft/variable-substitution@v1
+        with:
+          # comma separated list of XML/JSON/YAML files in which tokens are to be substituted. Files names must be specified relative to the folder-path.
+          files: ./src/backend/config/app_config.yml,./src/docker/docker-compose.yml
+        env:
+          # app_config.yml
+          application_root: /api
+          cors: true
+          log_level: "INFO"
+          listen_port: 8080
+          admin_username: ${{ secrets.ADMIN_USERNAME }}
+          admin_password: ${{ secrets.ADMIN_PASSWORD }}
+          jwt_private_key: "./jwt/jwt.key"
+          jwt_public_key: "./jwt/jwt.key.pub"
+          mysql_host: mysql
+          mysql_port: 3306
+          mysql_database: ${{ secrets.MYSQL_DATABASE }}
+          mysql_user: ${{ secrets.MYSQL_USER }}
+          mysql_password: ${{ secrets.MYSQL_PASSWORD }}
+          mysql_pool_size: 32
+          # docker-compose.yml
+          services.mysql.environment.MYSQL_ROOT_PASSWORD: ${{ secrets.MYSQL_ROOT_PASSWORD }}
+          services.mysql.environment.MYSQL_USER: ${{ secrets.MYSQL_USER }}
+          services.mysql.environment.MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD }}
+          services.mysql.environment.MYSQL_DATABASE: ${{ secrets.MYSQL_DATABASE }}
+          
+      - name: Create key files
+        shell: bash
+        env:
+          JWT_PUBKEY: ${{ secrets.JWT_PUBKEY }}
+          JWT_KEY: ${{ secrets.JWT_KEY }}
+          DOMAIN_CERT_FULLCHAIN: ${{ secrets.DOMAIN_CERT_FULLCHAIN }}
+          DOMAIN_CERT_KEY: ${{ secrets.DOMAIN_CERT_KEY }}
+        run: |
+          echo "$JWT_PUBKEY" > ./src/backend/config/jwt/jwt.key.pub
+          echo "$JWT_KEY" > ./src/backend/config/jwt/jwt.key
+          echo "$DOMAIN_CERT_FULLCHAIN" > ./src/docker/config/cert/fullchain.cer
+          echo "$DOMAIN_CERT_KEY" > ./src/docker/config/cert/key.pem
+          
+      # Generate dist file for web app
+      - name: Install node
+        uses: actions/setup-node@v2
+        
+      - name: Build web
+        working-directory: ./src/web
+        run: |
+          npm install
+          npm run build
+      
+      # Docker compose
+      # https://github.com/docker/compose/issues/7686
+      - name: Docker compose remote deployment
+        env:
+          SSH_KEY: ${{ secrets.SSH_KEY }}
+          SSH_USER_HOST: ${{ secrets.SSH_USER_HOST }}
+          COMPOSE_PARAMIKO_SSH: 1
+          COMPOSE_DOCKER_CLI_BUILD: 0
+        working-directory: ./src/docker
+        run: |
+          eval $(ssh-agent)
+          ssh-add - <<< "$SSH_KEY"
+          mkdir ~/.ssh/
+          ssh-keyscan $(awk -F '@' '{print $2}' <<< $SSH_USER_HOST) > ~/.ssh/known_hosts
+          docker-compose -H ssh://$SSH_USER_HOST up -d --build

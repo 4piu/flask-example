@@ -1,0 +1,26 @@
+[[source]]
+url = "https://pypi.tuna.tsinghua.edu.cn/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+coloredlogs = "*"
+pyjwt = { extras = ["crypto"], version = "*" }
+pyyaml = "*"
+durations = "*"
+bjoern = { version = "*", markers = "sys_platform == 'linux'" }
+flask = "*"
+flasgger = "*"
+Flask-APScheduler = "*"
+flask-cors = "*"
+Flask-SQLAlchemy = "*"
+mysql-connector-python = "*"
+webargs = "*"
+pycryptodome = "*"
+
+[dev-packages]
+pytest = "*"
+requests = "*"
+
+[requires]
+python_version = "3.9"
